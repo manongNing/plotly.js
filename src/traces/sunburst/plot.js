@@ -717,9 +717,10 @@ function attachFxHandlers(sliceTop, gd, cd) {
         var nextEntry = isEntry(pt) ?
             findEntryWithChild(hierarchy, id) :
             findEntryWithLevel(hierarchy, id);
+        var level = getPtId(nextEntry);
 
         var frame = {
-            data: [{level: getPtId(nextEntry)}],
+            data: [{level: level}],
             traces: [trace.index]
         };
 
@@ -739,7 +740,8 @@ function attachFxHandlers(sliceTop, gd, cd) {
         Fx.loneUnhover(fullLayoutNow._hoverlayer.node());
         Registry.call('animate', gd, frame, animOpts);
 
-        // TODO hook in uirevision
+        // TODO hook in uirevision in animate, to make it work like:
+        // Registry.call('_guiRestyle', gd, 'level', level);
     });
 }
 

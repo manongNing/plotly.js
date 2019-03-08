@@ -2493,6 +2493,7 @@ function guiEdit(func) {
 exports._guiRestyle = guiEdit(restyle);
 exports._guiRelayout = guiEdit(relayout);
 exports._guiUpdate = guiEdit(update);
+// exports._guiAnimate = guiEdit(exports.animate);
 
 // For connecting edited layout attributes to uirevision attrs
 // If no `attr` we use `match[1] + '.uirevision'`
@@ -2524,6 +2525,7 @@ var traceUIControlPatterns = [
     // "visible" includes trace.transforms[i].styles[j].value.visible
     {pattern: /(^|value\.)visible$/, attr: 'legend.uirevision'},
     {pattern: /^dimensions\[\d+\]\.constraintrange/},
+    {pattern: /^level$/},
 
     // below this you must be in editable: true mode
     // TODO: I still put name and title with `trace.uirevision`
