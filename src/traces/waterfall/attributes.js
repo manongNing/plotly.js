@@ -16,8 +16,16 @@ var dash = require('../../components/drawing/attributes').dash;
 var lineAttrs = require('../scatter/attributes').line;
 
 function directionAttrs() {
-    var attr = extendFlat({}, barAttrs.marker, {});
-    return attr;
+    return {
+        editType: 'style',
+        color: barAttrs.marker.color,
+        opacity: barAttrs.marker.opacity,
+        line: {
+            editType: 'style',
+            color: barAttrs.marker.line.color,
+            width: barAttrs.marker.line.width
+        }
+    };
 }
 
 module.exports = {

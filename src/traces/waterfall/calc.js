@@ -9,8 +9,6 @@
 'use strict';
 
 var Axes = require('../../plots/cartesian/axes');
-var hasColorscale = require('../../components/colorscale/helpers').hasColorscale;
-var colorscaleCalc = require('../../components/colorscale/calc');
 var arraysToCalcdata = require('./arrays_to_calcdata');
 var calcSelection = require('../scatter/calc_selection');
 
@@ -69,22 +67,6 @@ module.exports = function calc(gd, trace) {
             vals[i] = (cd[i].isSum) ? 0 :
                 (i === 0) ? cd[i].s : cd[i].s - cd[i - 1].s;
         }
-    }
-
-    // auto-z and autocolorscale if applicable
-    if(hasColorscale(trace, 'marker')) {
-        colorscaleCalc(gd, trace, {
-            vals: (trace._autoMarkerColor) ? vals : trace.marker.color,
-            containerStr: 'marker',
-            cLetter: 'c'
-        });
-    }
-    if(hasColorscale(trace, 'marker.line')) {
-        colorscaleCalc(gd, trace, {
-            vals: (trace._autoMarkerLineColor) ? vals : trace.marker.line.color,
-            containerStr: 'marker.line',
-            cLetter: 'c'
-        });
     }
 
     arraysToCalcdata(cd, trace, vals);

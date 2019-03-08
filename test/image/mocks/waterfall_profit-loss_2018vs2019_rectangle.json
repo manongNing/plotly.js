@@ -40,27 +40,7 @@
                 null,
                 -45,
                 null
-            ],
-            "marker": {
-                "color": [],
-                "cmin": -500,
-                "cmax": 500,
-                "colorscale": [
-                    [0, "rgb(255, 0, 0)"],
-                    [0.499, "rgb(222, 222, 222)"],
-                    [0.5, "rgb(0, 255, 0)"],
-                    [0.501, "rgb(222, 222, 222)"],
-                    [1, "rgb(0, 0, 255)"]
-                ],
-                "reversescale": false,
-                "showscale": true,
-                "colorbar": {
-                    "title": "",
-                    "len": 0.4,
-                    "y": 0.3,
-                    "yanchor": "bottom"
-                }
-            }
+            ]
         },
         {
             "name": "2019",
@@ -102,32 +82,12 @@
                 null,
                 -15,
                 null
-            ],
-            "marker": {
-                "color": [],
-                "cmin": -500,
-                "cmax": 500,
-                "colorscale": [
-                    [0, "rgb(255, 0, 0)"],
-                    [0.499, "rgb(222, 222, 222)"],
-                    [0.5, "rgb(0, 191, 0)"],
-                    [0.501, "rgb(222, 222, 222)"],
-                    [1, "rgb(0, 0, 255)"]
-                ],
-                "reversescale": false,
-                "showscale": false,
-                "colorbar": {
-                    "title": "",
-                    "len": 0.4,
-                    "y": 0.3,
-                    "yanchor": "bottom"
-                }
-            }
+            ]
         }
     ],
     "layout": {
         "title": {
-            "text": "Profit and loss statement 2018 vs 2019<br>waterfall chart with colorscale"
+            "text": "Profit and loss statement 2018 vs 2019<br>waterfall chart"
         },
         "yaxis": {
             "type": "category",

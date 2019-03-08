@@ -13,8 +13,15 @@ var Lib = require('../../lib');
 
 var handleGroupingDefaults = require('../bar/defaults').handleGroupingDefaults;
 var handleXYDefaults = require('../scatter/xy_defaults');
-var handleStyleDefaults = require('./style_defaults');
 var attributes = require('./attributes');
+var Color = require('../../components/color');
+
+function handleDirection(coerce, direction, defaultColor) {
+    coerce(direction + '.color', defaultColor);
+    coerce(direction + '.line.color', Color.defaultLine);
+    coerce(direction + '.line.width');
+    coerce(direction + '.opacity');
+}
 
 function supplyDefaults(traceIn, traceOut, defaultColor, layout) {
     function coerce(attr, dflt) {
@@ -68,7 +75,12 @@ function supplyDefaults(traceIn, traceOut, defaultColor, layout) {
         coerce('cliponaxis');
     }
 
-    handleStyleDefaults(traceIn, traceOut, coerce, defaultColor, layout);
+    handleDirection(coerce, 'increasing', '#FF0000');
+    handleDirection(coerce, 'decreasing', '#00FF00');
+    handleDirection(coerce, 'marker', defaultColor);
+
+    coerce('selected.marker.color');
+    coerce('unselected.marker.color');
 
     Lib.coerceSelectionMarkerOpacity(traceOut, coerce);
 
