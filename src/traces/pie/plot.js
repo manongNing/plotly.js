@@ -254,6 +254,7 @@ function plot(gd, cdpie) {
     }, 0);
 }
 
+// TODO add support for transition
 function plotTextLines(slices, trace) {
     slices.each(function(pt) {
         var sliceTop = d3.select(this);

@@ -11,6 +11,7 @@
 var d3 = require('d3');
 var d3Hierarchy = require('d3-hierarchy');
 
+var Registry = require('../../registry');
 var Fx = require('../../components/fx');
 var Color = require('../../components/color');
 var Drawing = require('../../components/drawing');
@@ -27,392 +28,494 @@ var plotTextLines = require('../pie/plot').plotTextLines;
 var formatPieValue = require('../pie/helpers').formatPieValue;
 var styleOne = require('./style').styleOne;
 
-var TRANSITION_TIME = 1000;
+var CLICK_TRANSITION_TIME = 1000;
+var CLICK_TRANSITION_EASING = 'linear'; // TODO or something else?
 
-module.exports = function plot(gd, cdmodule) {
+module.exports = function(gd, cdmodule, transitionOpts, makeOnCompleteCallback) {
     var fullLayout = gd._fullLayout;
     var layer = fullLayout._sunburstlayer;
-    var gs = fullLayout._size;
+    var join, onComplete;
+
+    // If transition config is provided, then it is only a partial replot and traces not
+    // updated are removed.
+    var isFullReplot = !transitionOpts;
+    var hasTransition = transitionOpts && transitionOpts.duration > 0;
 
     // TODO add 'stroke-linejoin': 'round' or 'stroke-miterlimit' ???
 
-    Lib.makeTraceGroups(layer, cdmodule, 'trace').each(function(cd) {
-        var gTrace = d3.select(this);
-        var cd0 = cd[0];
-        var trace = cd0.trace;
-        var hierarchy = cd0.hierarchy;
-        var maxDepth = trace.maxdepth >= 0 ? trace.maxdepth : Infinity;
+    join = layer.selectAll('g.trace.sunburst')
+        .data(cdmodule, function(cd) { return cd[0].trace.uid; });
 
-        var domain = trace.domain;
-        var vpw = gs.w * (domain.x[1] - domain.x[0]);
-        var vph = gs.h * (domain.y[1] - domain.y[0]);
-        var rMax = 0.5 * Math.min(vpw, vph);
-        var cx = cd0.cx = gs.l + gs.w * (domain.x[1] + domain.x[0]) / 2;
-        var cy = cd0.cy = gs.t + gs.h * (1 - domain.y[0]) - vph / 2;
+    join.enter().append('g')
+        .classed('trace', true)
+        .classed('sunburst', true);
 
-        function render(entry) {
-            var slices = gTrace.selectAll('g.slice');
+    join.order();
 
-            if(!entry) {
-                slices.remove();
-                return;
-            }
+    if(hasTransition) {
+        if(makeOnCompleteCallback) {
+            // If it was passed a callback to register completion, make a callback. If
+            // this is created, then it must be executed on completion, otherwise the
+            // pos-transition redraw will not execute:
+            onComplete = makeOnCompleteCallback();
+        }
 
-            var prevRootPt;
+        var transition = d3.transition()
+            .duration(transitionOpts.duration)
+            .ease(transitionOpts.easing)
+            .each('end', function() { onComplete && onComplete(); })
+            .each('interrupt', function() { onComplete && onComplete(); });
 
-            slices.each(function(pt) {
-                pt.data.data.prev = {
-                    rpx0: pt.rpx0,
-                    rpx1: pt.rpx1,
-                    x0: pt.x0,
-                    x1: pt.x1,
-                    transform: pt.transform
-                };
-                if(!pt.parent) {
-                    prevRootPt = pt;
-                }
+        transition.each(function() {
+            // Must run the selection again since otherwise enters/updates get grouped together
+            // and these get executed out of order. Except we need them in order!
+            layer.selectAll('g.trace').each(function(cd) {
+                plotOne(gd, cd, this, transitionOpts);
             });
+        });
+    } else {
+        join.each(function(cd) {
+            plotOne(gd, cd, this, transitionOpts);
+        });
+    }
 
-            var sliceData = partition(entry).descendants();
-            var maxHeight = entry.height + 1;
-            var yOffset = 0;
-            var cutoff = maxDepth;
+    if(isFullReplot) {
+        join.exit().remove();
+    }
+};
 
-            if(cd0.hasMultipleRoots && sliceData[0].data.data.pid === '') {
-                sliceData = sliceData.slice(1);
-                maxHeight -= 1;
-                yOffset = 1;
-                cutoff += 1;
-            }
+function plotOne(gd, cd, element, transitionOpts) {
+    var fullLayout = gd._fullLayout;
+    // TODO could optimize hasTransition per trace,
+    // as sunburst has no cross-trace logic!
+    var hasTransition = transitionOpts && transitionOpts.duration > 0;
 
-            sliceData = sliceData.filter(function(pt) { return pt.y1 <= cutoff; });
+    var gTrace = d3.select(element);
+    var slices = gTrace.selectAll('g.slice');
 
-            // TODO clean up variable names
-            // -> differentiate between 'entry root' and 'hierarchy root'
+    var cd0 = cd[0];
+    var trace = cd0.trace;
+    var hierarchy = cd0.hierarchy;
+    var entry = findEntryWithLevel(hierarchy, trace.level);
+    var maxDepth = trace.maxdepth >= 0 ? trace.maxdepth : Infinity;
 
-            var rootPt = sliceData[0];
-            var maxY = Math.min(maxHeight, maxDepth);
-            var y2rpx = function(y) { return (y - yOffset) / maxY * rMax; };
-            var rx2px = function(r, x) { return [r * Math.cos(x), -r * Math.sin(x)]; };
-            var pathSlice = function(d) { return Lib.pathAnnulus(d.rpx0, d.rpx1, d.x0, d.x1, cx, cy); };
-            var makeTweenFn = function(prev, next) {
-                var interp = d3.interpolate(prev, next);
-                return function(t) { return pathSlice(interp(t)); };
+    var gs = fullLayout._size;
+    var domain = trace.domain;
+    var vpw = gs.w * (domain.x[1] - domain.x[0]);
+    var vph = gs.h * (domain.y[1] - domain.y[0]);
+    var rMax = 0.5 * Math.min(vpw, vph);
+    var cx = cd0.cx = gs.l + gs.w * (domain.x[1] + domain.x[0]) / 2;
+    var cy = cd0.cy = gs.t + gs.h * (1 - domain.y[0]) - vph / 2;
+
+    if(!entry) {
+        return slices.remove();
+    }
+
+    // previous root 'pt' (can be empty)
+    var prevEntry = null;
+    // stash of 'previous' position data used by tweening functions
+    var prevLookup = {};
+
+    if(hasTransition) {
+        // Important: do this before binding new sliceData!
+        slices.each(function(pt) {
+            prevLookup[getPtId(pt)] = {
+                rpx0: pt.rpx0,
+                rpx1: pt.rpx1,
+                x0: pt.x0,
+                x1: pt.x1,
+                transform: pt.transform
             };
 
-            slices = slices.data(sliceData, function(pt) { return pt.data.data.id; });
+            if(!prevEntry && isEntry(pt)) {
+                prevEntry = pt;
+            }
+        });
+    }
 
-            slices.enter().append('g').classed('slice', true);
+    // N.B. slice data isn't the calcdata,
+    // grab corresponding calcdata item in sliceData[i].data.data
+    var sliceData = partition(entry).descendants();
+    var maxHeight = entry.height + 1;
+    var yOffset = 0;
+    var cutoff = maxDepth;
 
-            slices.exit().each(function(pt) {
-                var sliceTop = d3.select(this).transition()
-                    .duration(TRANSITION_TIME)
-                    .each('end', function(pt2) {
-                        pt2.data.data.prev = null;
-                        d3.select(this).remove();
-                    });
+    // N.B. handle multiple-root special case
+    if(cd0.hasMultipleRoots && isHierachyRoot(entry)) {
+        sliceData = sliceData.slice(1);
+        maxHeight -= 1;
+        yOffset = 1;
+        cutoff += 1;
+    }
+
+    // filter out slices that won't show up on graph
+    sliceData = sliceData.filter(function(pt) { return pt.y1 <= cutoff; });
+
+    // partition span ('y') to sector radial px value
+    var maxY = Math.min(maxHeight, maxDepth);
+    var y2rpx = function(y) { return (y - yOffset) / maxY * rMax; };
+    // (radial px value, partition angle ('x'))  to px [x,y]
+    var rx2px = function(r, x) { return [r * Math.cos(x), -r * Math.sin(x)]; };
+    // slice path generation fn
+    var pathSlice = function(d) { return Lib.pathAnnulus(d.rpx0, d.rpx1, d.x0, d.x1, cx, cy); };
+    // slice text translate x/y
+    var transTextX = function(d) { return cx + d.pxmid[0] * d.transform.rCenter + (d.transform.x || 0); };
+    var transTextY = function(d) { return cy + d.pxmid[1] * d.transform.rCenter + (d.transform.y || 0); };
+
+    slices = slices.data(sliceData, function(pt) { return getPtId(pt); });
+
+    slices.enter().append('g')
+        .classed('slice', true);
+
+    if(hasTransition) {
+        slices.exit().transition()
+            .each(function() {
+                var sliceTop = d3.select(this);
 
                 var slicePath = sliceTop.select('path.surface');
-
-                slicePath.attrTween('d', function(pt2) {
-                    var next;
-                    var rootPtPrev = rootPt.data.data.prev;
-
-                    if(rootPtPrev) {
-                        var a = pt2.x1 > rootPtPrev.x1 ? 2 * Math.PI : 0;
-                        // if pt to remove:
-                        // - if 'below' where the root-node used to be: shrink it radially inward
-                        // - otherwise, collapse it clockwise or counterclockwise which ever is shortest to theta=0
-                        next = pt2.rpx1 < rootPtPrev.rpx1 ? {rpx0: 0, rpx1: 0} : {x0: a, x1: a};
-                    } else {
-                        // this happens when maxdepth is set, when leaves must
-                        // be removed and the rootPt is new (i.e. does not have a 'prev' object)
-                        var parent;
-                        var parentId = pt2.parent.data.data.id;
-                        slices.each(function(pt3) {
-                            if(!parent && pt3.data.data.id === parentId) {
-                                parent = pt3;
-                            }
-                        });
-                        var parentChildren = parent.children;
-                        var ci;
-                        parentChildren.forEach(function(pt3, i) {
-                            if(pt3.data.data.id === pt2.data.data.id) {
-                                return ci = i;
-                            }
-                        });
-                        var n = parentChildren.length;
-                        var interp = d3.interpolate(parent.x0, parent.x1);
-                        next = {
-                            rpx0: rMax, rpx1: rMax,
-                            x0: interp(ci / n), x1: interp((ci + 1) / n)
-                        };
-                    }
-
-                    return makeTweenFn(pt.data.data.prev, next);
+                slicePath.transition().attrTween('d', function(pt2) {
+                    var interp = makeExitSliceInterpolator(pt2);
+                    return function(t) { return pathSlice(interp(t)); };
                 });
 
                 var sliceTextGroup = sliceTop.select('g.slicetext');
                 sliceTextGroup.attr('opacity', 0);
 
-                // TODO text lines
-            });
+                // for outside text - TODO maybe remove?
+                var sliceTextLine = sliceTop.select('path.textline');
+                sliceTextLine.attr('opacity', 0);
+            })
+            .remove();
+    } else {
+        slices.exit().remove();
+    }
 
-            var hasOutsideText = false;
-            var quadrants = [
-                [[], []], // y<0: x<0, x>=0
-                [[], []]  // y>=0: x<0, x>=0
-            ];
+    slices.order();
 
-            var nextX1ofPrevRootPt = null;
-            if(prevRootPt) {
-                var prevRootPtId = prevRootPt.data.data.id;
-                slices.each(function(pt) {
-                    if(nextX1ofPrevRootPt === null && (pt.data.data.id === prevRootPtId)) {
-                        nextX1ofPrevRootPt = pt.x1;
-                    }
-                });
+    // next x1 (i.e. sector end angle) of previous entry
+    var nextX1ofPrevEntry = null;
+    if(hasTransition && prevEntry) {
+        var prevEntryId = getPtId(prevEntry);
+        slices.each(function(pt) {
+            if(nextX1ofPrevEntry === null && (getPtId(pt) === prevEntryId)) {
+                nextX1ofPrevEntry = pt.x1;
             }
+        });
+    }
 
-            slices.each(function(pt) {
-                var sliceTop = d3.select(this);
-                var cdi = pt.data.data;
-                var isRoot = cdi.pid === '';
-                var isLeaf = !pt.children;
+    // used to scoot outside labels
+    var hasOutsideText = false;
+    var quadrants = [
+        [[], []], // y<0: x<0, x>=0
+        [[], []]  // y>=0: x<0, x>=0
+    ];
 
-                var slicePath = Lib.ensureSingle(sliceTop, 'path', 'surface', function(s) {
-                    s.style('pointer-events', 'all');
-                });
+    var updateSlices = slices;
+    if(hasTransition) {
+        updateSlices = updateSlices.transition().each('end', function() {
+            // N.B. gd._transitioning is *true* by the time `Plotly.animate`
+            // gets to here
+            var sliceTop = d3.select(this);
+            setSliceCursor(sliceTop, gd, {isTransitioning: false});
+        });
+    }
 
-                pt.next = {x0: pt.x0, x1: pt.x1};
-                pt.rpx0 = pt.next.rpx0 = y2rpx(pt.y0);
-                pt.rpx1 = pt.next.rpx1 = y2rpx(pt.y1);
-                pt.xmid = (pt.x0 + pt.x1) / 2;
-                pt.pxmid = rx2px(pt.rpx1, pt.xmid);
-                pt.midangle = -(pt.xmid - Math.PI / 2);
-                pt.halfangle = 0.5 * Math.min(Lib.angleDelta(pt.x0, pt.x1) || Math.PI, Math.PI);
-                pt.ring = 1 - (pt.rpx0 / pt.rpx1);
-                pt.rInscribed = getInscribedRadiusFraction(pt, trace);
-                quadrants[pt.pxmid[1] < 0 ? 0 : 1][pt.pxmid[0] < 0 ? 0 : 1].push(pt);
+    updateSlices.each(function(pt) {
+        var sliceTop = d3.select(this);
 
-                slicePath.transition()
-                    .duration(TRANSITION_TIME)
-                    .attrTween('d', function(pt2) {
-                        var prev0 = pt2.data.data.prev;
-                        var prev;
+        var slicePath = Lib.ensureSingle(sliceTop, 'path', 'surface', function(s) {
+            s.style('pointer-events', 'all');
+        });
 
-                        if(prev0) {
-                            // if pt already on graph, this is easy
-                            prev = prev0;
-                        } else {
-                            // for new pts:
-                            if(prevRootPt) {
-                                // if trace was visible before
-                                if(pt2.parent) {
-                                    if(nextX1ofPrevRootPt) {
-                                        // if new branch, twist it in clockwise or
-                                        // counterclockwise which ever is shorter to
-                                        // its final angle
-                                        var a = pt2.x1 > nextX1ofPrevRootPt ? 2 * Math.PI : 0;
-                                        prev = {x0: a, x1: a};
-                                    } else {
-                                        var parent = pt2.parent;
-                                        var parentPrev = parent.data.data.prev;
+        pt.rpx0 = y2rpx(pt.y0);
+        pt.rpx1 = y2rpx(pt.y1);
+        pt.xmid = (pt.x0 + pt.x1) / 2;
+        pt.pxmid = rx2px(pt.rpx1, pt.xmid);
+        pt.midangle = -(pt.xmid - Math.PI / 2);
+        pt.halfangle = 0.5 * Math.min(Lib.angleDelta(pt.x0, pt.x1) || Math.PI, Math.PI);
+        pt.ring = 1 - (pt.rpx0 / pt.rpx1);
+        pt.rInscribed = getInscribedRadiusFraction(pt, trace);
+        quadrants[pt.pxmid[1] < 0 ? 0 : 1][pt.pxmid[0] < 0 ? 0 : 1].push(pt);
 
-                                        // if new leaf (when maxdepth is set),
-                                        // grow it radially and angularly from
-                                        // its parent node
-                                        prev = {rpx0: rMax, rpx1: rMax};
-
-                                        if(parentPrev) {
-                                            var parentChildren = parent.children;
-                                            var ci = parentChildren.indexOf(pt2);
-                                            var n = parentChildren.length;
-                                            var interp = d3.interpolate(parentPrev.x0, parentPrev.x1);
-                                            prev.x0 = interp(ci / n);
-                                            prev.x1 = interp(ci / n);
-                                        } else {
-                                            // TODO !!!
-                                            // HOW ???
-                                            prev.x0 = prev.x1 = 0;
-                                        }
-                                    }
-                                } else {
-                                    // if new root-node, grow it radially
-                                    prev = {rpx0: 0, rpx1: 0};
-                                }
-                            } else {
-                                // start sector of new traces from theta=0
-                                prev = {x0: 0, x1: 0};
-                            }
-                        }
-
-                        return makeTweenFn(prev, pt2.next);
-                    });
-
-                slicePath.call(styleOne, pt, trace);
-                sliceTop.call(attachHoverHandlers, gd, cd);
-
-                if(!isLeaf && !isRoot) {
-                    sliceTop
-                        .call(setCursor, 'pointer')
-                        .call(attachClickHandlers, gd, cd, render);
-                }
-                // else { TODO attach leaf/root click handlers? }
-
-                var sliceTextGroup = Lib.ensureSingle(sliceTop, 'g', 'slicetext');
-                var sliceText = Lib.ensureSingle(sliceTextGroup, 'text', '', function(s) {
-                    // prohibit tex interpretation until we can handle
-                    // tex and regular text together
-                    s.attr('data-notex', 1);
-                });
-
-                var textPosition = isLeaf ? trace.leaf.textposition : 'inside';
-
-                sliceText.text(formatSliceLabel(pt, trace, fullLayout))
-                    .classed('slicetext', true)
-                    .attr('text-anchor', 'middle')
-                    .call(Drawing.font, isRoot || textPosition === 'outside' ?
-                      determineOutsideTextFont(trace, pt, fullLayout.font) :
-                      determineInsideTextFont(trace, pt, fullLayout.font))
-                    .call(svgTextUtils.convertToTspans, gd);
-
-                // position the text relative to the slice
-                var textBB = Drawing.bBox(sliceText.node());
-                var transform;
-
-                if(textPosition === 'outside') {
-                    transform = transformOutsideText(textBB, pt);
-                } else {
-                    transform = transformInsideText(textBB, pt, cd0);
-                    if(textPosition === 'auto' && transform.scale < 1) {
-                        sliceText.call(Drawing.font, trace.outsidetextfont);
-                        if(trace.outsidetextfont.family !== trace.insidetextfont.family ||
-                                trace.outsidetextfont.size !== trace.insidetextfont.size) {
-                            textBB = Drawing.bBox(sliceText.node());
-                        }
-                        transform = transformOutsideText(textBB, pt);
-                    }
-                }
-
-                pt.transform = transform;
-
-                // save some stuff to use later ensure no labels overlap
-                if(transform.outside) {
-                    var translateY = cy + pt.pxmid[1] * transform.rCenter + (transform.y || 0);
-                    pt.px0 = rx2px(pt.rpx0, pt.x0);
-                    pt.px1 = rx2px(pt.rpx1, pt.x1);
-                    pt.cxFinal = cx;
-                    pt.cyFinal = cy;
-                    pt.yLabelMin = translateY - textBB.height / 2;
-                    pt.yLabelMid = translateY;
-                    pt.yLabelMax = translateY + textBB.height / 2;
-                    pt.labelExtraX = 0;
-                    pt.labelExtraY = 0;
-                    hasOutsideText = true;
-                }
-
-                sliceText.transition()
-                    .duration(TRANSITION_TIME)
-                    .attrTween('transform', function(pt2) {
-                        var prev0 = pt2.data.data.prev;
-                        var transform2 = pt2.transform;
-                        var prev;
-
-                        if(prev0) {
-                            prev = prev0;
-                        } else {
-                            prev = {
-                                rpx1: pt2.rpx1,
-                                transform: {
-                                    scale: 0,
-                                    rotate: transform2.rotate,
-                                    rCenter: transform2.rCenter,
-                                    x: transform2.x,
-                                    y: transform2.y
-                                }
-                            };
-
-                            // for new pts:
-                            if(prevRootPt) {
-                                // if trace was visible before
-                                if(pt2.parent) {
-                                    if(nextX1ofPrevRootPt) {
-                                        // if new branch, twist it in clockwise or
-                                        // counterclockwise which ever is shorter to
-                                        // its final angle
-                                        var a = pt2.x1 > nextX1ofPrevRootPt ? 2 * Math.PI : 0;
-                                        prev.x0 = prev.x1 = a;
-                                    } else {
-                                        var parent = pt2.parent;
-                                        var parentPrev = parent.data.data.prev;
-
-                                        if(parentPrev) {
-                                            // if new leaf with visible parent
-                                            var parentChildren = parent.children;
-                                            var ci = parentChildren.indexOf(pt2);
-                                            var n = parentChildren.length;
-                                            var interp = d3.interpolate(parentPrev.x0, parentPrev.x1);
-                                            prev.x0 = interp(ci / n);
-                                            prev.x1 = interp(ci / n);
-                                        } else {
-                                            // if new leaf w/o visible parent
-                                            // TODO !!!
-                                            // HOW ???
-                                            prev.x0 = prev.x1 = 0;
-                                        }
-                                    }
-                                } else {
-                                    // if new root-node
-                                    prev.x0 = prev.x1 = 0;
-                                }
-                            } else {
-                                // on new traces
-                                prev.x0 = prev.x1 = 0;
-                            }
-                        }
-
-                        var rpx1Fn = d3.interpolate(prev.rpx1, pt2.rpx1);
-                        var x0Fn = d3.interpolate(prev.x0, pt2.x0);
-                        var x1Fn = d3.interpolate(prev.x1, pt2.x1);
-                        var scaleFn = d3.interpolate(prev.transform.scale, transform2.scale);
-                        var rotateFn = d3.interpolate(prev.transform.rotate, transform2.rotate);
-                        var rCenterFn = d3.interpolate(prev.transform.rCenter, transform2.rCenter);
-
-                        return function(t) {
-                            var rpx1Now = rpx1Fn(t);
-                            var x0Now = x0Fn(t);
-                            var x1Now = x1Fn(t);
-                            var scaleNow = scaleFn(t);
-                            var rotateNow = rotateFn(t);
-                            var rCenterNow = rCenterFn(t);
-
-                            var pxmid = rx2px(rpx1Now, (x0Now + x1Now) / 2);
-                            var tx = cx + pxmid[0] * rCenterNow + (transform.x || 0);
-                            var ty = cy + pxmid[1] * rCenterNow + (transform.y || 0);
-
-                            return 'translate(' + tx + ',' + ty + ')' +
-                                (scaleNow < 1 ? ('scale(' + scaleNow + ')') : '') +
-                                (rotateNow ? ('rotate(' + rotateNow + ')') : '') +
-                                'translate(' +
-                                    (-(textBB.left + textBB.right) / 2) + ',' +
-                                    (-(textBB.top + textBB.bottom) / 2) +
-                                ')';
-                        };
-                    });
+        if(hasTransition) {
+            slicePath.transition().attrTween('d', function(pt2) {
+                var interp = makeUpdateSliceIntepolator(pt2);
+                return function(t) { return pathSlice(interp(t)); };
             });
-
-            if(hasOutsideText) {
-                scootLabels(quadrants, trace);
-            }
-
-            // TODO fade in/out
-            plotTextLines(slices, trace);
+        } else {
+            slicePath.attr('d', pathSlice);
         }
 
-        render(findEntryWithLevel(hierarchy, trace.level));
+        sliceTop
+            .call(attachHoverHandlers, gd, cd)
+            .call(attachClickHandlers, gd, cd)
+            .call(setSliceCursor, gd, {isTransitioning: gd._transitioning});
+
+        slicePath.call(styleOne, pt, trace);
+
+        var sliceTextGroup = Lib.ensureSingle(sliceTop, 'g', 'slicetext');
+        var sliceText = Lib.ensureSingle(sliceTextGroup, 'text', '', function(s) {
+            // prohibit tex interpretation until we can handle
+            // tex and regular text together
+            s.attr('data-notex', 1);
+        });
+
+        var textPosition = isLeaf(pt) ? trace.leaf.textposition : 'inside';
+
+        sliceText.text(formatSliceLabel(pt, trace, fullLayout))
+            .classed('slicetext', true)
+            .attr('text-anchor', 'middle')
+            .call(Drawing.font, isHierachyRoot(pt) || textPosition === 'outside' ?
+              determineOutsideTextFont(trace, pt, fullLayout.font) :
+              determineInsideTextFont(trace, pt, fullLayout.font))
+            .call(svgTextUtils.convertToTspans, gd);
+
+        // position the text relative to the slice
+        var textBB = Drawing.bBox(sliceText.node());
+        var transform;
+
+        if(textPosition === 'outside') {
+            transform = transformOutsideText(textBB, pt);
+        } else {
+            transform = transformInsideText(textBB, pt, cd0);
+            if(textPosition === 'auto' && transform.scale < 1) {
+                sliceText.call(Drawing.font, trace.outsidetextfont);
+                if(trace.outsidetextfont.family !== trace.insidetextfont.family ||
+                        trace.outsidetextfont.size !== trace.insidetextfont.size) {
+                    textBB = Drawing.bBox(sliceText.node());
+                }
+                transform = transformOutsideText(textBB, pt);
+            }
+        }
+
+        pt.transform = transform;
+        pt.translateX = transTextX(pt);
+        pt.translateY = transTextY(pt);
+
+        // save some stuff to use later ensure no labels overlap
+        if(transform.outside) {
+            pt.px0 = rx2px(pt.rpx0, pt.x0);
+            pt.px1 = rx2px(pt.rpx1, pt.x1);
+            pt.cxFinal = cx;
+            pt.cyFinal = cy;
+            pt.yLabelMin = pt.translateY - textBB.height / 2;
+            pt.yLabelMid = pt.translateY;
+            pt.yLabelMax = pt.translateY + textBB.height / 2;
+            pt.labelExtraX = 0;
+            pt.labelExtraY = 0;
+            hasOutsideText = true;
+        }
+
+        var strTransform = function(d, textBB) {
+            return 'translate(' + d.translateX + ',' + d.translateY + ')' +
+                (d.transform.scale < 1 ? ('scale(' + d.transform.scale + ')') : '') +
+                (d.transform.rotate ? ('rotate(' + d.transform.rotate + ')') : '') +
+                'translate(' +
+                    (-(textBB.left + textBB.right) / 2) + ',' +
+                    (-(textBB.top + textBB.bottom) / 2) +
+                ')';
+        };
+
+        if(hasTransition) {
+            sliceText.transition().attrTween('transform', function(pt2) {
+                var interp = makeUpdateTextInterpolar(pt2);
+                return function(t) { return strTransform(interp(t), textBB); };
+            });
+        } else {
+            sliceText.attr('transform', strTransform(pt, textBB));
+        }
     });
-};
+
+    if(hasOutsideText) {
+        scootLabels(quadrants, trace);
+    }
+
+    plotTextLines(slices, trace);
+
+    function makeExitSliceInterpolator(pt) {
+        var id = getPtId(pt);
+        var prev = prevLookup[id];
+        var entryPrev = prevLookup[getPtId(entry)];
+        var next;
+
+        if(entryPrev) {
+            var a = pt.x1 > entryPrev.x1 ? 2 * Math.PI : 0;
+            // if pt to remove:
+            // - if 'below' where the root-node used to be: shrink it radially inward
+            // - otherwise, collapse it clockwise or counterclockwise which ever is shortest to theta=0
+            next = pt.rpx1 < entryPrev.rpx1 ? {rpx0: 0, rpx1: 0} : {x0: a, x1: a};
+        } else {
+            // this happens when maxdepth is set, when leaves must
+            // be removed and the rootPt is new (i.e. does not have a 'prev' object)
+            var parent;
+            var parentId = getPtId(pt.parent);
+            slices.each(function(pt2) {
+                if(getPtId(pt2) === parentId) {
+                    return parent = pt2;
+                }
+            });
+            var parentChildren = parent.children;
+            var ci;
+            parentChildren.forEach(function(pt2, i) {
+                if(getPtId(pt2) === id) {
+                    return ci = i;
+                }
+            });
+            var n = parentChildren.length;
+            var interp = d3.interpolate(parent.x0, parent.x1);
+            next = {
+                rpx0: rMax, rpx1: rMax,
+                x0: interp(ci / n), x1: interp((ci + 1) / n)
+            };
+        }
+
+        return d3.interpolate(prev, next);
+    }
+
+    function makeUpdateSliceIntepolator(pt) {
+        var prev0 = prevLookup[getPtId(pt)];
+        var prev;
+        var next = {x0: pt.x0, x1: pt.x1, rpx0: pt.rpx0, rpx1: pt.rpx1};
+
+        if(prev0) {
+            // if pt already on graph, this is easy
+            prev = prev0;
+        } else {
+            // for new pts:
+            if(prevEntry) {
+                // if trace was visible before
+                if(pt.parent) {
+                    if(nextX1ofPrevEntry) {
+                        // if new branch, twist it in clockwise or
+                        // counterclockwise which ever is shorter to
+                        // its final angle
+                        var a = pt.x1 > nextX1ofPrevEntry ? 2 * Math.PI : 0;
+                        prev = {x0: a, x1: a};
+                    } else {
+                        // if new leaf (when maxdepth is set),
+                        // grow it radially and angularly from
+                        // its parent node
+                        prev = {rpx0: rMax, rpx1: rMax};
+                        Lib.extendFlat(prev, interpX0X1FromParent(pt));
+                    }
+                } else {
+                    // if new root-node, grow it radially
+                    prev = {rpx0: 0, rpx1: 0};
+                }
+            } else {
+                // start sector of new traces from theta=0
+                prev = {x0: 0, x1: 0};
+            }
+        }
+
+        return d3.interpolate(prev, next);
+    }
+
+    function makeUpdateTextInterpolar(pt) {
+        var prev0 = prevLookup[getPtId(pt)];
+        var prev;
+        var transform = pt.transform;
+
+        if(prev0) {
+            prev = prev0;
+        } else {
+            prev = {
+                rpx1: pt.rpx1,
+                transform: {
+                    scale: 0,
+                    rotate: transform.rotate,
+                    rCenter: transform.rCenter,
+                    x: transform.x,
+                    y: transform.y
+                }
+            };
+
+            // for new pts:
+            if(prevEntry) {
+                // if trace was visible before
+                if(pt.parent) {
+                    if(nextX1ofPrevEntry) {
+                        // if new branch, twist it in clockwise or
+                        // counterclockwise which ever is shorter to
+                        // its final angle
+                        var a = pt.x1 > nextX1ofPrevEntry ? 2 * Math.PI : 0;
+                        prev.x0 = prev.x1 = a;
+                    } else {
+                        // if leaf
+                        Lib.extendFlat(prev, interpX0X1FromParent(pt));
+                    }
+                } else {
+                    // if new root-node
+                    prev.x0 = prev.x1 = 0;
+                }
+            } else {
+                // on new traces
+                prev.x0 = prev.x1 = 0;
+            }
+        }
+
+        var rpx1Fn = d3.interpolate(prev.rpx1, pt.rpx1);
+        var x0Fn = d3.interpolate(prev.x0, pt.x0);
+        var x1Fn = d3.interpolate(prev.x1, pt.x1);
+        var scaleFn = d3.interpolate(prev.transform.scale, transform.scale);
+        var rotateFn = d3.interpolate(prev.transform.rotate, transform.rotate);
+        var rCenterFn = d3.interpolate(prev.transform.rCenter, transform.rCenter);
+
+        return function(t) {
+            var rpx1 = rpx1Fn(t);
+            var x0 = x0Fn(t);
+            var x1 = x1Fn(t);
+            var rCenter = rCenterFn(t);
+
+            var d = {
+                pxmid: rx2px(rpx1, (x0 + x1) / 2),
+                transform: {
+                    rCenter: rCenter,
+                    x: transform.x,
+                    y: transform.y
+                }
+            };
+
+            // TODO need to consider labelExtraX and labelExtraY ... at first (?)
+
+            var out = {
+                rpx1: rpx1Fn(t),
+                translateX: transTextX(d),
+                translateY: transTextY(d),
+                transform: {
+                    scale: scaleFn(t),
+                    rotate: rotateFn(t),
+                    rCenter: rCenter
+                }
+            };
+
+            return out;
+        };
+    }
+
+    function interpX0X1FromParent(pt) {
+        var parent = pt.parent;
+        var parentPrev = prevLookup[getPtId(parent)];
+        var out = {};
+
+        if(parentPrev) {
+            // if new leaf with visible parent
+            var parentChildren = parent.children;
+            var ci = parentChildren.indexOf(pt);
+            var n = parentChildren.length;
+            var interp = d3.interpolate(parentPrev.x0, parentPrev.x1);
+            out.x0 = interp(ci / n);
+            out.x1 = interp(ci / n);
+        } else {
+            // if new leaf w/o visible parent
+            // TODO !!!
+            // HOW ???
+            out.x0 = out.x1 = 0;
+        }
+
+        return out;
+    }
+}
 
 // x[0-1] keys are angles [radians]
 // y[0-1] keys are hierarchy heights [integers]
@@ -424,9 +527,9 @@ function partition(entry) {
 function findEntryWithLevel(hierarchy, level) {
     var out;
     if(level) {
-        hierarchy.eachAfter(function(d) {
-            if(!out && d.data.data.id === level) {
-                out = d.copy();
+        hierarchy.eachAfter(function(pt) {
+            if(getPtId(pt) === level) {
+                return out = pt.copy();
             }
         });
     }
@@ -435,18 +538,40 @@ function findEntryWithLevel(hierarchy, level) {
 
 function findEntryWithChild(hierarchy, childId) {
     var out;
-    hierarchy.eachAfter(function(d) {
-        if(!out) {
-            var children = d.children || [];
-            for(var i = 0; i < children.length; i++) {
-                var child = children[i];
-                if(child.data.data.id === childId) {
-                    out = d.copy();
-                }
+    hierarchy.eachAfter(function(pt) {
+        var children = pt.children || [];
+        for(var i = 0; i < children.length; i++) {
+            var child = children[i];
+            if(getPtId(child) === childId) {
+                return out = pt.copy();
             }
         }
     });
     return out || hierarchy;
+}
+
+function isHierachyRoot(pt) {
+    var cdi = pt.data.data;
+    return cdi.pid === '';
+}
+
+function isEntry(pt) {
+    return !pt.parent;
+}
+
+function isLeaf(pt) {
+    return !pt.children;
+}
+
+function getPtId(pt) {
+    var cdi = pt.data.data;
+    return cdi.id;
+}
+
+function setSliceCursor(sliceTop, gd, opts) {
+    var pt = sliceTop.datum();
+    var isTransitioning = (opts || {}).isTransitioning;
+    setCursor(sliceTop, (isTransitioning || isLeaf(pt) || isHierachyRoot(pt)) ? null : 'pointer');
 }
 
 function attachHoverHandlers(sliceTop, gd, cd) {
@@ -557,10 +682,11 @@ function attachHoverHandlers(sliceTop, gd, cd) {
             hasHoverLabel = false;
         }
     });
+
+    // TODO handle click!!
 }
 
-// TODO or call restyle (or animate), but would that smoothly transition?
-function attachClickHandlers(sliceTop, gd, cd, render) {
+function attachClickHandlers(sliceTop, gd, cd) {
     var cd0 = cd[0];
     var trace = cd0.trace;
 
@@ -572,27 +698,46 @@ function attachClickHandlers(sliceTop, gd, cd, render) {
         });
         if(clickVal === false) return;
 
-        var fullLayoutNow = gd._fullLayout;
+        // nothing when clicking on leaves or the hierarchy root
+        if(isLeaf(pt) || isHierachyRoot(pt)) return;
+
+        // skip if triggered from dragging a nearby cartesian subplot
         if(gd._dragging) return;
 
-        // TODO skip during animations!
+        // skip during transitions, to avoid potential bugs
+        // we could remove this check later
+        if(gd._transitioning) return;
+
+        var fullLayoutNow = gd._fullLayout;
+        var hierarchy = cd0.hierarchy;
+        var id = getPtId(pt);
+
+        var nextEntry = isEntry(pt) ?
+            findEntryWithChild(hierarchy, id) :
+            findEntryWithLevel(hierarchy, id);
+
+        var frame = {
+            data: [{level: getPtId(nextEntry)}],
+            traces: [trace.index]
+        };
+
+        var animOpts = {
+            frame: {
+                redraw: false,
+                duration: CLICK_TRANSITION_TIME
+            },
+            transition: {
+                duration: CLICK_TRANSITION_TIME,
+                easing: CLICK_TRANSITION_EASING
+            },
+            mode: 'immediate',
+            fromcurrent: true
+        };
 
         Fx.loneUnhover(fullLayoutNow._hoverlayer.node());
-        // Lib.raiseToTop(this);
+        Registry.call('animate', gd, frame, animOpts);
 
-        var hierarchy = cd0.hierarchy;
-        var cdi = pt.data.data;
-        var id = cdi.id;
-
-        var entry = pt.parent ?
-            findEntryWithLevel(hierarchy, id) :
-            findEntryWithChild(hierarchy, id);
-
-        var level = entry.descendants()[0].data.data.id;
-        trace.level = trace._input.level = level;
-
-        render(entry);
-
+        // TODO hook in uirevision
         // TODO event data
         // TODO should we trigger 'plotly_click' also?
     });
