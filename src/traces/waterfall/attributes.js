@@ -15,6 +15,11 @@ var barAttrs = require('../bar/attributes');
 var dash = require('../../components/drawing/attributes').dash;
 var lineAttrs = require('../scatter/attributes').line;
 
+function directionAttrs() {
+    var attr = extendFlat({}, barAttrs.marker, {});
+    return attr;
+}
+
 module.exports = {
 
     initialized: {
@@ -61,7 +66,9 @@ module.exports = {
 
     width: barAttrs.width,
 
-    marker: barAttrs.marker,
+    marker: directionAttrs(),
+    increasing: directionAttrs(),
+    decreasing: directionAttrs(),
 
     connector: {
         color: extendFlat({}, lineAttrs.color, {dflt: '#FFFFFF'}),

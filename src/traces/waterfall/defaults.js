@@ -10,8 +10,6 @@
 'use strict';
 
 var Lib = require('../../lib');
-var Color = require('../../components/color');
-var Registry = require('../../registry');
 
 var handleGroupingDefaults = require('../bar/defaults').handleGroupingDefaults;
 var handleXYDefaults = require('../scatter/xy_defaults');
@@ -71,13 +69,6 @@ function supplyDefaults(traceIn, traceOut, defaultColor, layout) {
     }
 
     handleStyleDefaults(traceIn, traceOut, coerce, defaultColor, layout);
-
-    var lineColor = (traceOut.marker.line || {}).color;
-
-    // override defaultColor for error bars with defaultLine
-    var errorBarsSupplyDefaults = Registry.getComponentMethod('errorbars', 'supplyDefaults');
-    errorBarsSupplyDefaults(traceIn, traceOut, lineColor || Color.defaultLine, {axis: 'y'});
-    errorBarsSupplyDefaults(traceIn, traceOut, lineColor || Color.defaultLine, {axis: 'x', inherit: 'y'});
 
     Lib.coerceSelectionMarkerOpacity(traceOut, coerce);
 

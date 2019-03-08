@@ -39,26 +39,11 @@
                 -45,
                 null
             ],
-            "marker": {
-                "shape": "rectangle",
-                "color": [],
-                "cmin": -500,
-                "cmax": 500,
-                "colorscale": [
-                    [0, "rgb(255, 0, 0)"],
-                    [0.499, "rgb(255, 0, 0)"],
-                    [0.5, "rgb(127, 127, 127)"],
-                    [0.501, "rgb(0, 0, 255)"],
-                    [1, "rgb(0, 0, 255)"]
-                ],
-                "reversescale": false,
-                "showscale": false,
-                "colorbar": {
-                    "title": "",
-                    "len": 0.4,
-                    "y": 0.3,
-                    "yanchor": "bottom"
-                }
+            "increasing": {
+                "color": "rgb(255, 127, 0)"
+            },
+            "decreasing": {
+                "color": "rgb(127, 255, 0)"
             }
         }
     ],
