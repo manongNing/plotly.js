@@ -17,10 +17,14 @@ var extendFlat = require('../../lib/extend').extendFlat;
 
 // TODO should we use singular `label`, `parent` and `value`?
 
+// TODO add `anim: true` to animatable attributes,
+// watch out for tweening edge cases beyond what the sunburstclick handler handles!
+
 module.exports = {
     labels: {
         valType: 'data_array',
         editType: 'calc',
+        anim: true,
         description: [
             'Sets the labels of each of the sunburst sectors.'
         ].join(' ')
@@ -28,6 +32,7 @@ module.exports = {
     parents: {
         valType: 'data_array',
         editType: 'calc',
+        anim: true,
         description: [
             'Sets the parent sectors for each of the sunburst sectors.',
             'Empty string items \'\' are understood to reference',
@@ -41,6 +46,7 @@ module.exports = {
     values: {
         valType: 'data_array',
         editType: 'calc',
+        anim: true,
         description: [
             'Sets the values associated with each of the sunburst sectors.',
             'Use with `branchvalues` to determine how the values are summed.'
@@ -51,6 +57,7 @@ module.exports = {
         values: ['total', 'extra'],
         dflt: 'extra',
         editType: 'calc',
+        anim: true,
         role: 'info',
         description: [
             'Determines how the items in `values` are summed.',
@@ -64,6 +71,7 @@ module.exports = {
         valType: 'any',
         editType: 'plot',
         role: 'info',
+        anim: true,
         dflt: '',
         description: [
             'Sets the level from which this sunburst trace hierarchy is rendered.',
