@@ -37,7 +37,8 @@ module.exports = function calc(gd, trace) {
     for(i = 0; i < serieslen; i++) {
         cd[i] = {
             p: pos[i],
-            s: size[i]
+            s: size[i],
+            rawS: size[i]
         };
 
         if(i === 0 && trace.initialized === true) {

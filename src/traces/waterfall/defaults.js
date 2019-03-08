@@ -75,8 +75,8 @@ function supplyDefaults(traceIn, traceOut, defaultColor, layout) {
         coerce('cliponaxis');
     }
 
-    handleDirection(coerce, 'increasing', '#FF0000');
-    handleDirection(coerce, 'decreasing', '#00FF00');
+    handleDirection(coerce, 'increasing', '#00FF00');
+    handleDirection(coerce, 'decreasing', '#FF0000');
     handleDirection(coerce, 'marker', defaultColor);
 
     coerce('selected.marker.color');
