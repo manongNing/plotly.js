@@ -41,14 +41,14 @@ module.exports = function(gd, cdmodule, transitionOpts, makeOnCompleteCallback) 
     var isFullReplot = !transitionOpts;
     var hasTransition = transitionOpts && transitionOpts.duration > 0;
 
-    // TODO add 'stroke-linejoin': 'round' or 'stroke-miterlimit' ???
-
     join = layer.selectAll('g.trace.sunburst')
         .data(cdmodule, function(cd) { return cd[0].trace.uid; });
 
     join.enter().append('g')
         .classed('trace', true)
         .classed('sunburst', true);
+
+    // TODO add 'stroke-linejoin': 'round' or 'stroke-miterlimit' ???
 
     join.order();
 
@@ -86,7 +86,7 @@ module.exports = function(gd, cdmodule, transitionOpts, makeOnCompleteCallback) 
 
 function plotOne(gd, cd, element, transitionOpts) {
     var fullLayout = gd._fullLayout;
-    // TODO could optimize hasTransition per trace,
+    // We could optimize hasTransition per trace,
     // as sunburst has no cross-trace logic!
     var hasTransition = transitionOpts && transitionOpts.duration > 0;
 
@@ -213,8 +213,8 @@ function plotOne(gd, cd, element, transitionOpts) {
     var updateSlices = slices;
     if(hasTransition) {
         updateSlices = updateSlices.transition().each('end', function() {
-            // N.B. gd._transitioning is *true* by the time `Plotly.animate`
-            // gets to here
+            // N.B. gd._transitioning is (still) *true* by the time
+            // transition updates get hare
             var sliceTop = d3.select(this);
             setSliceCursor(sliceTop, gd, {isTransitioning: false});
         });
@@ -247,8 +247,7 @@ function plotOne(gd, cd, element, transitionOpts) {
         }
 
         sliceTop
-            .call(attachHoverHandlers, gd, cd)
-            .call(attachClickHandlers, gd, cd)
+            .call(attachFxHandlers, gd, cd)
             .call(setSliceCursor, gd, {isTransitioning: gd._transitioning});
 
         slicePath.call(styleOne, pt, trace);
@@ -499,7 +498,7 @@ function plotOne(gd, cd, element, transitionOpts) {
         var out = {};
 
         if(parentPrev) {
-            // if new leaf with visible parent
+            // if parent is visible
             var parentChildren = parent.children;
             var ci = parentChildren.indexOf(pt);
             var n = parentChildren.length;
@@ -507,9 +506,8 @@ function plotOne(gd, cd, element, transitionOpts) {
             out.x0 = interp(ci / n);
             out.x1 = interp(ci / n);
         } else {
-            // if new leaf w/o visible parent
-            // TODO !!!
-            // HOW ???
+            // w/o visible parent
+            // TODO !!! HOW ???
             out.x0 = out.x1 = 0;
         }
 
@@ -574,7 +572,7 @@ function setSliceCursor(sliceTop, gd, opts) {
     setCursor(sliceTop, (isTransitioning || isLeaf(pt) || isHierachyRoot(pt)) ? null : 'pointer');
 }
 
-function attachHoverHandlers(sliceTop, gd, cd) {
+function attachFxHandlers(sliceTop, gd, cd) {
     var cd0 = cd[0];
     var trace = cd0.trace;
 
@@ -683,23 +681,29 @@ function attachHoverHandlers(sliceTop, gd, cd) {
         }
     });
 
-    // TODO handle click!!
-}
-
-function attachClickHandlers(sliceTop, gd, cd) {
-    var cd0 = cd[0];
-    var trace = cd0.trace;
-
     sliceTop.on('click', function(pt) {
+        // TODO: this does not support right-click. If we want to support it, we
+        // would likely need to change pie to use dragElement instead of straight
+        // mapbox event binding. Or perhaps better, make a simple wrapper with the
+        // right mousedown, mousemove, and mouseup handlers just for a left/right click
+        // mapbox would use this too.
+        var fullLayoutNow = gd._fullLayout;
         var traceNow = gd._fullData[trace.index];
+
         var clickVal = Events.triggerHandler(gd, 'plotly_sunburstclick', {
             points: [makeEventData(pt, traceNow)],
             event: d3.event
         });
-        if(clickVal === false) return;
 
-        // nothing when clicking on leaves or the hierarchy root
-        if(isLeaf(pt) || isHierachyRoot(pt)) return;
+        // 'regular' click event when sunburstclick is disabled or when
+        // clikcin on leaves or the hierarchy root
+        if(clickVal === false || isLeaf(pt) || isHierachyRoot(pt)) {
+            if(fullLayoutNow.hovermode) {
+                gd._hoverdata = [makeEventData(pt, traceNow)];
+                Fx.click(gd, d3.event);
+            }
+            return;
+        }
 
         // skip if triggered from dragging a nearby cartesian subplot
         if(gd._dragging) return;
@@ -708,10 +712,8 @@ function attachClickHandlers(sliceTop, gd, cd) {
         // we could remove this check later
         if(gd._transitioning) return;
 
-        var fullLayoutNow = gd._fullLayout;
         var hierarchy = cd0.hierarchy;
         var id = getPtId(pt);
-
         var nextEntry = isEntry(pt) ?
             findEntryWithChild(hierarchy, id) :
             findEntryWithLevel(hierarchy, id);
@@ -738,8 +740,6 @@ function attachClickHandlers(sliceTop, gd, cd) {
         Registry.call('animate', gd, frame, animOpts);
 
         // TODO hook in uirevision
-        // TODO event data
-        // TODO should we trigger 'plotly_click' also?
     });
 }
 
