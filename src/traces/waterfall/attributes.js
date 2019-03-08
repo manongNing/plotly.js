@@ -30,15 +30,14 @@ function directionAttrs() {
 
 module.exports = {
 
-    initialized: {
+    fall: {
         valType: 'boolean',
         dflt: false,
-
+        arrayOk: true,
         role: 'info',
         editType: 'calc',
         description: [
-            'Could be used to display the first value as an initial value',
-            'rather than the difference.'
+            'Using false to display relative values and true for absolute values.'
         ].join(' ')
     },
 

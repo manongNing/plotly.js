@@ -41,12 +41,12 @@ module.exports = function calc(gd, trace) {
             rawS: size[i]
         };
 
-        if(i === 0 && trace.initialized === true) {
+        if(i === 0 && trace.fall && trace.fall[0]) {
             previousSum = cd[i].s; // this is a special case to allow using first element contain an initial value
 
             cd[i].isSum = true;
             cd[i].s = previousSum;
-        } else if(cd[i].s === undefined) {
+        } else if(trace.fall[i]) {
 
             cd[i].isSum = true;
             cd[i].s = previousSum;

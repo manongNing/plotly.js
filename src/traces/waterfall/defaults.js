@@ -36,7 +36,7 @@ function supplyDefaults(traceIn, traceOut, defaultColor, layout) {
         return;
     }
 
-    coerce('initialized');
+    coerce('fall');
 
     coerce('orientation', (traceOut.x && !traceOut.y) ? 'h' : 'v');
     coerce('offset');
