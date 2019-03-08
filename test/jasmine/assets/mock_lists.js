@@ -32,6 +32,7 @@ var svgMockList = [
     ['scattercarpet', require('@mocks/scattercarpet.json')],
     ['shapes', require('@mocks/shapes.json')],
     ['splom_iris', require('@mocks/splom_iris.json')],
+    ['sunburst_first', require('@mocks/sunburst_first.json')],
     ['table_wrapped_birds', require('@mocks/table_wrapped_birds.json')],
     ['ternary_fill', require('@mocks/ternary_fill.json')],
     ['text_chart_arrays', require('@mocks/text_chart_arrays.json')],
