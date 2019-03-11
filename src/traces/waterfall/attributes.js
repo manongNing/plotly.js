@@ -30,10 +30,10 @@ function directionAttrs() {
 
 module.exports = {
 
-    value: {
+    valuetype: {
         valType: 'enumerated',
-        values: ['relative', 'absolute', 'total'],
-        dflt: 'relative',
+        values: ['r', 'relative', 'a', 'absolute', 't', 'total'],
+        dflt: [],
         arrayOk: true,
         role: 'info',
         editType: 'calc',

@@ -39,7 +39,7 @@ function supplyDefaults(traceIn, traceOut, defaultColor, layout) {
         return;
     }
 
-    coerce('value');
+    coerce('valuetype');
 
     coerce('orientation', (traceOut.x && !traceOut.y) ? 'h' : 'v');
     coerce('offset');

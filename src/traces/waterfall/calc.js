@@ -12,6 +12,14 @@ var Axes = require('../../plots/cartesian/axes');
 var arraysToCalcdata = require('./arrays_to_calcdata');
 var calcSelection = require('../scatter/calc_selection');
 
+function isAbsolute(a) {
+    return (a === 'a' || a === 'absolute');
+}
+
+function isTotal(a) {
+    return (a === 't' || a === 'total');
+}
+
 module.exports = function calc(gd, trace) {
     var xa = Axes.getFromId(gd, trace.xaxis || 'x');
     var ya = Axes.getFromId(gd, trace.yaxis || 'y');
@@ -42,16 +50,17 @@ module.exports = function calc(gd, trace) {
             rawS: amount
         };
 
-        if(i === 0 && trace.value && trace.value[0] === 'absolute') {
-            previousSum = cd[i].s; // this is a special case to allow using first element contain an initial value
+        if(isAbsolute(trace.valuetype[i])) {
+
+            previousSum = cd[i].s;
 
             cd[i].isSum = true;
             cd[i].s = previousSum;
-        } else if(trace.value[i] === 'total') {
+        } else if(isTotal(trace.valuetype[i])) {
 
             cd[i].isSum = true;
             cd[i].s = previousSum;
-        } else {
+        } else { // default: relative
             cd[i].isSum = false;
             newSize = cd[i].s;
             cd[i].s = previousSum + newSize;

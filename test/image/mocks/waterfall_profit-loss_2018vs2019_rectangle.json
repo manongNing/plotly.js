@@ -5,7 +5,7 @@
             "type": "waterfall",
             "orientation": "h",
             "opacity": 0.5,
-            "value": [
+            "valuetype": [
                 "relative",
                 "relative",
                 "relative",
@@ -64,7 +64,7 @@
             "name": "2019",
             "type": "waterfall",
             "orientation": "h",
-            "value": [
+            "valuetype": [
                 "relative",
                 "relative",
                 "relative",
@@ -115,7 +115,7 @@
                 123,
                 198,
                 null,
-                -15,
+                -53.7,
                 null
             ]
         }
