@@ -75,7 +75,6 @@ function supplyDefaults(traceIn, traceOut, defaultColor, layout) {
         coerce('constraintext');
         coerce('selected.textfont.color');
         coerce('unselected.textfont.color');
-        coerce('cliponaxis');
     }
 
     handleDirection(coerce, 'increasing', INCREASING_COLOR);

@@ -66,8 +66,6 @@ module.exports = {
 
     constraintext: barAttrs.constraintext,
 
-    cliponaxis: barAttrs.cliponaxis,
-
     orientation: barAttrs.orientation,
 
     offset: barAttrs.offset,
