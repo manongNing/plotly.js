@@ -16,6 +16,9 @@ var handleXYDefaults = require('../scatter/xy_defaults');
 var attributes = require('./attributes');
 var Color = require('../../components/color');
 
+var INCREASING_COLOR = '#3D9970';
+var DECREASING_COLOR = '#FF4136';
+
 function handleDirection(coerce, direction, defaultColor) {
     coerce(direction + '.color', defaultColor);
     coerce(direction + '.line.color', Color.defaultLine);
@@ -36,7 +39,7 @@ function supplyDefaults(traceIn, traceOut, defaultColor, layout) {
         return;
     }
 
-    coerce('fall');
+    coerce('value');
 
     coerce('orientation', (traceOut.x && !traceOut.y) ? 'h' : 'v');
     coerce('offset');
@@ -75,8 +78,8 @@ function supplyDefaults(traceIn, traceOut, defaultColor, layout) {
         coerce('cliponaxis');
     }
 
-    handleDirection(coerce, 'increasing', '#00FF00');
-    handleDirection(coerce, 'decreasing', '#FF0000');
+    handleDirection(coerce, 'increasing', INCREASING_COLOR);
+    handleDirection(coerce, 'decreasing', DECREASING_COLOR);
     handleDirection(coerce, 'marker', defaultColor);
 
     coerce('selected.marker.color');

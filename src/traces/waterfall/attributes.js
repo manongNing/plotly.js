@@ -30,14 +30,15 @@ function directionAttrs() {
 
 module.exports = {
 
-    fall: {
-        valType: 'boolean',
-        dflt: false,
+    value: {
+        valType: 'enumerated',
+        values: ['relative', 'absolute'],
+        dflt: 'relative',
         arrayOk: true,
         role: 'info',
         editType: 'calc',
         description: [
-            'Using false to display relative values and true for absolute values.'
+            'Using false to display relative values and true for total values.'
         ].join(' ')
     },
 

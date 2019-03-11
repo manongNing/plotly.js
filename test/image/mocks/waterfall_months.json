@@ -2,22 +2,34 @@
     "data":
     [{
         "type": "waterfall",
-        "fall": [true, false, false, false, true, false, false, false, true],
+        "increassing": { "color": "rgb(255, 0, 0)" },
+        "decreassing": { "color": "rgb(0, 255, 0)" },
+        "marker": { "color": "rgb(0, 0, 255)" },
+        "value": [true, false, false, false, true, false, false, false, true],
         "x": ["Initial", "Jan-Feb", "Mar-Apr", "May-Jun", "Mid-year", "Jul-Aug", "Sep-Oct", "Nov-Dec", "Full year"],
         "y": [25, -1.1, -2.1, -3.1, null, -4.1, -5.1, -6.1, null]
     }, {
         "type": "waterfall",
-        "fall": [true, false, false, false, true, false, false, false, true],
+        "increassing": { "color": "rgb(191, 0, 0)" },
+        "decreassing": { "color": "rgb(0, 191, 0)" },
+        "marker": { "color": "rgb(0, 0, 191)" },
+        "value": [true, false, false, false, true, false, false, false, true],
         "x": ["Initial", "Jan-Feb", "Mar-Apr", "May-Jun", "Mid-year", "Jul-Aug", "Sep-Oct", "Nov-Dec", "Full year"],
         "y": [4, 1.2, 2.2, 3.2, null, 4.2, 5.2, 6.2, null]
     }, {
         "type": "waterfall",
-        "fall": [true, false, false, false, true, false, false, false, true],
+        "increassing": { "color": "rgb(127, 0, 0)" },
+        "decreassing": { "color": "rgb(0, 127, 0)" },
+        "marker": { "color": "rgb(0, 0, 127)" },
+        "value": [true, false, false, false, true, false, false, false, true],
         "x": ["Initial", "Jan-Feb", "Mar-Apr", "May-Jun", "Mid-year", "Jul-Aug", "Sep-Oct", "Nov-Dec", "Full year"],
         "y": [4, 6.3, 5.3, 4.3, null, 3.3, 2.3, 1.3, null]
     }, {
         "type": "waterfall",
-        "fall": [true, false, false, false, true, false, false, false, true],
+        "increassing": { "color": "rgb(63, 0, 0)" },
+        "decreassing": { "color": "rgb(0, 63, 0)" },
+        "marker": { "color": "rgb(0, 0, 63)" },
+        "value": [true, false, false, false, true, false, false, false, true],
         "x": ["Initial", "Jan-Feb", "Mar-Apr", "May-Jun", "Mid-year", "Jul-Aug", "Sep-Oct", "Nov-Dec", "Full year"],
         "y": [25, -6.4, -5.4, -4.4, null, -3.4, -2.4, -1.4, null]
     }],

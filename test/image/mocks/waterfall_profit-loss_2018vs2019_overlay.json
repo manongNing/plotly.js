@@ -4,7 +4,7 @@
             "name": "2018",
             "type": "waterfall",
             "orientation": "h",
-            "fall": [
+            "value": [
                 false,
                 false,
                 false,
@@ -58,16 +58,13 @@
                 -45,
                 null
             ],
-            "marker": {
-                "color": "rgb(0, 0, 255)"
-            },
-            "opacity": 0.75
+            "opacity": 0.5
         },
         {
             "name": "2019",
             "type": "waterfall",
             "orientation": "h",
-            "fall": [
+            "value": [
                 false,
                 false,
                 false,
@@ -121,10 +118,7 @@
                 -53.7,
                 null
             ],
-            "marker": {
-                "color": "rgb(255, 0, 0)"
-            },
-            "opacity": 0.75
+            "opacity": 0.5
         }
     ],
     "layout": {

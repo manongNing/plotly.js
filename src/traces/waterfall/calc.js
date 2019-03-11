@@ -35,18 +35,19 @@ module.exports = function calc(gd, trace) {
     var i;
 
     for(i = 0; i < serieslen; i++) {
+        var value = size[i] || 0;
         cd[i] = {
             p: pos[i],
-            s: size[i],
-            rawS: size[i]
+            s: value,
+            rawS: value
         };
 
-        if(i === 0 && trace.fall && trace.fall[0]) {
+        if(i === 0 && trace.value && trace.value[0]) {
             previousSum = cd[i].s; // this is a special case to allow using first element contain an initial value
 
             cd[i].isSum = true;
             cd[i].s = previousSum;
-        } else if(trace.fall[i]) {
+        } else if(trace.value[i]) {
 
             cd[i].isSum = true;
             cd[i].s = previousSum;

@@ -253,7 +253,7 @@ module.exports = function style(s, gd) {
             .attr('d', function(_, i) {
                 return (
                     (i === 0) ? 'M-6,-6V6H0Z' :
-                    (i === 1) ? 'M6,6V-6H0Z' : 'M6,6H0L-6,-6H0Z'
+                    (i === 1) ? 'M6,6V-6H0Z' : 'M6,6H0L-6,-6H-0Z'
                 );
             })
             .attr('transform', 'translate(20,0)');
