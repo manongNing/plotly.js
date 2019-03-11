@@ -32,7 +32,7 @@ module.exports = {
 
     value: {
         valType: 'enumerated',
-        values: ['relative', 'absolute'],
+        values: ['relative', 'absolute', 'total'],
         dflt: 'relative',
         arrayOk: true,
         role: 'info',

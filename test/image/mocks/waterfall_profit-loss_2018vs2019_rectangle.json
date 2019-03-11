@@ -6,22 +6,22 @@
             "orientation": "h",
             "opacity": 0.5,
             "value": [
-                false,
-                false,
-                false,
-                false,
-                false,
-                true,
-                false,
-                false,
-                false,
-                false,
-                true,
-                false,
-                false,
-                true,
-                false,
-                true
+                "relative",
+                "relative",
+                "relative",
+                "relative",
+                "relative",
+                "total",
+                "relative",
+                "relative",
+                "relative",
+                "relative",
+                "total",
+                "relative",
+                "relative",
+                "total",
+                "relative",
+                "total"
             ],
             "y": [
                 "2018/2019",
@@ -65,22 +65,22 @@
             "type": "waterfall",
             "orientation": "h",
             "value": [
-                false,
-                false,
-                false,
-                false,
-                false,
-                true,
-                false,
-                false,
-                false,
-                false,
-                true,
-                false,
-                false,
-                true,
-                false,
-                true
+                "relative",
+                "relative",
+                "relative",
+                "relative",
+                "relative",
+                "total",
+                "relative",
+                "relative",
+                "relative",
+                "relative",
+                "total",
+                "relative",
+                "relative",
+                "total",
+                "relative",
+                "total"
             ],
             "y": [
                 "2018/2019",
@@ -129,13 +129,11 @@
             "autorange": "reversed"
         },
         "xaxis": {
-            "type": "linear",
-            "autorange": true
+            "type": "linear"
         },
         "margin": { "l": 150 },
         "height": 800,
         "width": 800,
-        "autosize": true,
-        "showlegend": false
+        "showlegend": true
     }
 }
