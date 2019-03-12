@@ -47,9 +47,6 @@ function plotConnectors(gd, plotinfo, cdModule, traceLayer) {
         connectors.exit().remove();
 
         connectors.each(function(di, i) {
-            // do not draw connectors from the last item
-            if(i === connectors[0].length - 1) return;
-
             var connector = d3.select(this);
             var x0, x1, y0, y1;
             if(isHorizontal) {
@@ -62,6 +59,15 @@ function plotConnectors(gd, plotinfo, cdModule, traceLayer) {
                 x1 = xa.c2p(di.p0 + 1, true);
                 y0 = ya.c2p(di.s0, true);
                 y1 = ya.c2p(di.s1, true);
+            }
+
+            // do not extend connectors from the last item
+            if(i === connectors[0].length - 1) {
+                if(isHorizontal) {
+                    y1 = ya.c2p(di.p1, true);
+                } else {
+                    x1 = xa.c2p(di.p1, true);
+                }
             }
 
             var shape;
